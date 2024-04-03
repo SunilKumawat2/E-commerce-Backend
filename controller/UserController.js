@@ -76,6 +76,76 @@ const CreateUser = async (req, res) => {
         });
     }
 };
+const CreateUser1 = async (req, res) => {
+    try {
+        const { name, email, phone, password, conf_password } = req.body;
+
+        if (password !== conf_password) {
+            return res.status(400).json({
+                status: 400,
+                message: "Passwords do not match",
+            });
+        }
+
+        const exitsEmail = await User.findOne({ email });
+        if (exitsEmail) {
+            return res.status(400).json({ status: 400, message: "Email is already in Use" });
+        }
+
+        if (phone.length < 10) {
+            return res.status(400).json({
+                status: 400,
+                message: "Phone Number must be 10 digits",
+            });
+        }
+
+        if (phone.length > 12) {
+            return res.status(400).json({
+                status: 400,
+                message: "Phone Number must not exceed 12 digits",
+            });
+        }
+
+        // Send OTP and save it to the user's tokens array
+        const otp = await SendOTP(email);
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({
+            name,
+            email,
+            phone,
+            password: hashedPassword,
+            conf_password,
+        });
+
+        // Generate a Token
+        const token = jwt.sign({ userId: newUser._id }, 'your_secret_key');
+
+        newUser.tokens.push({
+            otp,
+            token,
+        });
+
+        // Save the user data
+        await newUser.save();
+
+        return res.status(201).json({
+            status: 201,
+            message: "Successfully Sign Up The User",
+            data: {
+                user: newUser,
+                token,
+                otp,
+            },
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: 500,
+            message: "Server Side error Sign Up The User",
+        });
+    }
+};
 
 // <------------ Authenticate UserLogin Token------------>
 const authenticateToken = (req, res, next) => {
